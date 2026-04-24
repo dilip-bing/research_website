@@ -144,7 +144,7 @@
       <section id="publications" class="section reveal">
         <div class="section-heading">
           <p class="eyebrow">Publications</p>
-          <h2>Peer-reviewed research and preprints</h2>
+          <h2>Under review</h2>
         </div>
         <div class="pub-papers">
           <article class="paper-card">
@@ -154,7 +154,7 @@
               <span class="paper-year">2026</span>
               <span class="status-badge status-under-review">
                 <span class="status-dot"></span>
-                Under Review · Preprint
+                Under Review
               </span>
             </div>
             <h3 class="paper-title">Neuro-Symbolic Planning via Adversarial Repair and Compilation</h3>
@@ -468,6 +468,40 @@
         <a href="mailto:tcdilip@engineer.com">Email</a>
       </div>
     </footer>
+
+    <div class="memora-widget" id="memoraWidget">
+      <button class="memora-launcher" id="memoraLauncher" type="button" aria-expanded="false" aria-controls="memoraWindow">
+        <span class="memora-launcher-icon" aria-hidden="true">
+          <img src="image/memora.png" alt="" class="memora-launcher-icon-img" />
+        </span>
+        <span class="memora-launcher-text">
+          <span>Memora AI</span>
+          <span>Ask anything about Dilip</span>
+        </span>
+      </button>
+
+      <section class="memora-window" id="memoraWindow" hidden aria-label="Memora chatbot">
+        <header class="memora-header">
+          <div>
+            <strong>Memora</strong>
+            <p>
+              LLM is hosted on a local machine, so replies can take a little longer.
+              Visit <a href="https://memora-jet.vercel.app/" target="_blank" rel="noopener noreferrer">Memora here ❤️</a>.
+            </p>
+          </div>
+          <button class="memora-close" id="memoraClose" type="button" aria-label="Close chat">✕</button>
+        </header>
+
+        <div class="memora-messages" id="memoraMessages" aria-live="polite">
+          <div class="memora-msg memora-msg-bot">Try: “What is Dilip currently researching?”, “Show key projects with links”, or “Summarize resume highlights.”</div>
+        </div>
+
+        <form class="memora-input-wrap" id="memoraForm">
+          <input id="memoraInput" class="memora-input" type="text" placeholder="Ask about projects, paper, resume..." autocomplete="off" required />
+          <button class="memora-send" id="memoraSend" type="submit">Send</button>
+        </form>
+      </section>
+    </div>
 
     <script src="script.js"></script>
   </body>

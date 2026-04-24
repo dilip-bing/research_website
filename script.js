@@ -72,7 +72,6 @@ if (!prefersReducedMotion && heroPanel) {
 
   const updateMotion = () => {
     const s = window.scrollY;
-    heroPanel.style.transform = `translate3d(0, ${Math.min(s * 0.05, 20)}px, 0)`;
     if (heroContent) heroContent.style.transform = `translate3d(0, ${-Math.min(s * 0.02, 10)}px, 0)`;
     ticking = false;
   };
@@ -277,3 +276,250 @@ if (!prefersReducedMotion) {
     });
   }
 }
+
+// ── Memora chatbot (Local LLM Option A polling) ───────────────
+(() => {
+  const launcher = document.getElementById('memoraLauncher');
+  const windowEl = document.getElementById('memoraWindow');
+  const closeBtn = document.getElementById('memoraClose');
+  const form = document.getElementById('memoraForm');
+  const input = document.getElementById('memoraInput');
+  const sendBtn = document.getElementById('memoraSend');
+  const messages = document.getElementById('memoraMessages');
+
+  if (!launcher || !windowEl || !closeBtn || !form || !input || !sendBtn || !messages) return;
+
+  const MEMORA_API = {
+    baseUrl: 'https://seen-figures-luis-adjusted.trycloudflare.com',
+    apiKey: '4002cc5c4d9472f53cc066bfdd098e8c53ebeeddd45d40cc23c15087da2f0364',
+    collection: 'documents',
+    model: 'gemma4:e2b',
+    pollIntervalMs: 1800,
+    maxPollAttempts: 45,
+    requestTimeoutMs: 15000,
+  };
+
+  const DILIP_MEMORY = {
+    identity: {
+      name: 'Dilip Kumar Thirukonda Chandrasekaran',
+      location: 'New York, NY',
+      email: 'tcdilip@engineer.com',
+      phone: '(607) 624-9390',
+      headline: 'AI Researcher and Engineer focused on neuro-symbolic planning, LLM automation, and intelligent systems',
+    },
+    links: {
+      linkedin: 'https://linkedin.com/in/dilipkumartc',
+      github: 'https://github.com/dilip-bing',
+      portfolio: 'https://dilip-bing.github.io/portfolio/',
+      paper_pdf: 'pdf/NeuroIPS_NeuroSymbolic_v3.pdf',
+      resume_pdf: 'pdf/resume_dilip_kumar_tc_master.pdf',
+      projects_page: 'https://dilip-bing.github.io/portfolio/',
+    },
+    education: [
+      'MS in Computer Science (AI Track), Binghamton University, expected May 2027, GPA 3.67/4.00',
+      'BE in Electronics and Communication Engineering, KLN College of Engineering, May 2019',
+    ],
+    research: {
+      paper_title: 'Neuro-Symbolic Planning via Adversarial Repair and Compilation',
+      venue_status: 'NeurIPS 2026, under review (preprint)',
+      summary: 'Treats LLM hallucination in PDDL generation as a repair problem. Uses structured critic feedback loops to classify failures and regenerate valid plans, improving reliability over blind retry baselines.',
+      highlights: [
+        'Explores error classes such as syntax, predicate mismatch, missing objects, goal semantic mismatch, and unsolvable outputs',
+        'Benchmarked across Blocksworld, Gripper, Logistics, and Ferry domains',
+        'Strong critic quality is identified as a key factor for final plan correctness',
+      ],
+    },
+    projects: [
+      'Neuro-Symbolic Planning via Adversarial Repair and Compilation — https://github.com/dilip-bing/neuro_symbolic_planner',
+      'LLM-Native Web Automation Framework — https://github.com/dilip-bing/job_marathon',
+      'Resume Builder — https://github.com/dilip-bing/resume_builder',
+      'NovaVO — https://github.com/dilip-bing/novavo',
+      'Tavus API CVI Vercel — https://github.com/dilip-bing/tavus_api_cvi_vercel',
+      'Gym Sync — https://github.com/dilip-bing/personal-project-body_food_habit_builder/tree/main/gym-sync',
+    ],
+    experience: [
+      'Tech Lead at Zoho Corporation (Aug 2023 – Jul 2025): led TestLab product lifecycle with a team of 10; led automation architecture and quality programs.',
+      'Software Engineer at Zoho (Sep 2021 – Aug 2023): Android, iOS, and web infrastructure; Kotlin, Swift/SwiftUI, React, MongoDB.',
+      'Automation Engineer at Zoho (Jan 2020 – Sep 2021): built and scaled 10,000+ automated tests using Espresso, Appium, Selenium, XCTest and CI/CD.',
+    ],
+    technical_skills: [
+      'Languages: Kotlin, Swift, Java, Python, JavaScript, TypeScript, Objective-C, SQL, C++, Shell/Bash, HTML/CSS',
+      'AI/LLM: Claude AI, LangChain, prompt engineering, RAG, LLM agent design',
+      'Testing/Automation: Espresso, UiAutomator, Kaspresso, XCTest, Appium, Selenium, GitHub Actions',
+      'Platform/Tools: Android SDK, Jetpack, SwiftUI, React.js, MongoDB, MySQL, Docker, Jira, Agile',
+    ],
+    current_focus: [
+      'LLM self-repair with compiler-guided loops',
+      'Natural language to executable test suites',
+      'Long-horizon context management in agentic systems',
+      'Unified memory architecture for personalized AI',
+      'Cross-modal automation using vision + language models',
+      'Prompt stability across LLM version upgrades',
+    ],
+  };
+
+  const llmChatHistory = [];
+  let isChatOpen = false;
+  let isLoading = false;
+
+  const setWindow = (open) => {
+    isChatOpen = open;
+    windowEl.hidden = !open;
+    launcher.setAttribute('aria-expanded', String(open));
+    if (open) input.focus();
+  };
+
+  const appendMessage = (text, role, extraClass = '') => {
+    const node = document.createElement('div');
+    node.className = `memora-msg ${role === 'user' ? 'memora-msg-user' : 'memora-msg-bot'} ${extraClass}`.trim();
+    node.textContent = text;
+    messages.appendChild(node);
+    messages.scrollTop = messages.scrollHeight;
+    return node;
+  };
+
+  const setLoading = (value) => {
+    isLoading = value;
+    sendBtn.disabled = value;
+    input.disabled = value;
+  };
+
+  const memoryContextText = () => {
+    return [
+      `Name: ${DILIP_MEMORY.identity.name}`,
+      `Location: ${DILIP_MEMORY.identity.location}`,
+      `Email: ${DILIP_MEMORY.identity.email}`,
+      `Phone: ${DILIP_MEMORY.identity.phone}`,
+      `Headline: ${DILIP_MEMORY.identity.headline}`,
+      `Links: ${JSON.stringify(DILIP_MEMORY.links)}`,
+      `Education: ${DILIP_MEMORY.education.join(' | ')}`,
+      `Research: ${DILIP_MEMORY.research.paper_title}. ${DILIP_MEMORY.research.venue_status}. ${DILIP_MEMORY.research.summary}. Highlights: ${DILIP_MEMORY.research.highlights.join(' | ')}`,
+      `Projects: ${DILIP_MEMORY.projects.join(' | ')}`,
+      `Experience: ${DILIP_MEMORY.experience.join(' | ')}`,
+      `Skills: ${DILIP_MEMORY.technical_skills.join(' | ')}`,
+      `Current focus: ${DILIP_MEMORY.current_focus.join(' | ')}`,
+    ].join('\n');
+  };
+
+  const fetchWithTimeout = async (url, options = {}, timeoutMs = MEMORA_API.requestTimeoutMs) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const fallbackAnswerFromMemory = (question) => {
+    const q = question.toLowerCase();
+
+    if (q.includes('project') || q.includes('github') || q.includes('repo')) {
+      return `I can't reach the local LLM right now, but here are Dilip's key projects:\n- ${DILIP_MEMORY.projects.join('\n- ')}`;
+    }
+    if (q.includes('paper') || q.includes('research') || q.includes('neurips') || q.includes('publication')) {
+      return `I can't reach the local LLM right now. Research snapshot:\n${DILIP_MEMORY.research.paper_title} (${DILIP_MEMORY.research.venue_status}). ${DILIP_MEMORY.research.summary}`;
+    }
+    if (q.includes('resume') || q.includes('experience') || q.includes('work') || q.includes('zoho')) {
+      return `I can't reach the local LLM right now. Experience summary:\n- ${DILIP_MEMORY.experience.join('\n- ')}`;
+    }
+    if (q.includes('contact') || q.includes('email') || q.includes('linkedin') || q.includes('portfolio')) {
+      return `I can't reach the local LLM right now. You can still contact Dilip via:\n- Email: ${DILIP_MEMORY.identity.email}\n- LinkedIn: ${DILIP_MEMORY.links.linkedin}\n- GitHub: ${DILIP_MEMORY.links.github}\n- Portfolio: ${DILIP_MEMORY.links.portfolio}`;
+    }
+
+    return `I can't reach the local LLM right now, but here's a quick profile:\n${DILIP_MEMORY.identity.name} is an ${DILIP_MEMORY.identity.headline}. Current focus includes ${DILIP_MEMORY.current_focus.slice(0, 3).join(', ')}.`;
+  };
+
+  const submitQuery = async (userQuestion) => {
+    const queryHeaders = {
+      'Content-Type': 'application/json',
+      'X-API-Key': MEMORA_API.apiKey,
+    };
+
+    const promptWithMemory =
+      `You are Memora, a concise assistant about Dilip. ` +
+      `Answer only from the provided memory and known profile data. ` +
+      `If uncertain, say that you don't have that detail yet.\n\n` +
+      `=== DILIP MEMORY ===\n${memoryContextText()}\n\n` +
+      `=== USER QUESTION ===\n${userQuestion}`;
+
+    const submitResponse = await fetchWithTimeout(`${MEMORA_API.baseUrl}/query`, {
+      method: 'POST',
+      headers: queryHeaders,
+      body: JSON.stringify({
+        question: promptWithMemory,
+        collection: MEMORA_API.collection,
+        thinking: true,
+        model: MEMORA_API.model,
+        chat_history: llmChatHistory,
+      }),
+    });
+
+    if (!submitResponse.ok) {
+      throw new Error(`Request failed (${submitResponse.status})`);
+    }
+
+    const submitJson = await submitResponse.json();
+    if (!submitJson.task_id) {
+      throw new Error('No task_id returned from local LLM API.');
+    }
+
+    let attempts = 0;
+    while (attempts < MEMORA_API.maxPollAttempts) {
+      attempts++;
+      const poll = await fetchWithTimeout(`${MEMORA_API.baseUrl}/query/${submitJson.task_id}`, {
+        method: 'GET',
+        headers: { 'X-API-Key': MEMORA_API.apiKey },
+      });
+
+      if (!poll.ok) {
+        throw new Error(`Polling failed (${poll.status})`);
+      }
+
+      const pollJson = await poll.json();
+      if (pollJson.status === 'completed') {
+        return pollJson.result?.answer || 'I could not generate an answer right now.';
+      }
+
+      if (pollJson.status === 'error') {
+        throw new Error(pollJson.error || 'Local LLM returned an error.');
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, MEMORA_API.pollIntervalMs));
+    }
+
+    throw new Error('Timed out waiting for local LLM response.');
+  };
+
+  launcher.addEventListener('click', () => setWindow(!isChatOpen));
+  closeBtn.addEventListener('click', () => setWindow(false));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isLoading) return;
+
+    const userText = input.value.trim();
+    if (!userText) return;
+
+    input.value = '';
+    appendMessage(userText, 'user');
+    const pendingNode = appendMessage('Thinking...', 'bot', 'memora-msg-muted');
+
+    setLoading(true);
+    try {
+      const answer = await submitQuery(userText);
+      pendingNode.remove();
+      appendMessage(answer, 'bot');
+
+      llmChatHistory.push({ role: 'user', content: userText });
+      llmChatHistory.push({ role: 'assistant', content: answer });
+    } catch (err) {
+      pendingNode.remove();
+      const reason = err instanceof Error ? err.message : 'Unknown network error';
+      appendMessage(`${fallbackAnswerFromMemory(userText)}\n\n(Reason: ${reason})`, 'bot');
+    } finally {
+      setLoading(false);
+      input.focus();
+    }
+  });
+})();
